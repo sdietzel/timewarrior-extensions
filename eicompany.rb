@@ -23,6 +23,11 @@ def is_workday?(day)
   !(day.holiday?(:de, :de_be) or day.saturday? or day.sunday?)
 end
 
+def pad(tag, value)
+  l = [tag.size + 1, 5].max
+  "%#{l}s" % value
+end
+
 report = ARGF.read
 config, entries = report.split("\n\n")
 
@@ -59,9 +64,7 @@ entries.each do |e|
   
   days[date] = {} unless days.has_key? date
 
-  unless e.has_key? 'tags'
-    puts "WARNING: Untagged entries on #{date}".red
-  else
+  if e.has_key? 'tags'
     e['tags'].each do |tag|
       tags.add(tag)
     
@@ -73,20 +76,17 @@ entries.each do |e|
   end
 end
 
-totals = tags.map{ |t| [t, 0] }.to_h
 expected = 0
 
 tags = SPECIAL_TAGS + (tags - Set.new(SPECIAL_TAGS)).to_a
+totals = tags.map{ |t| [t, 0] }.to_h
 
-puts '----- ' + report_start.strftime('%^B %Y') + ' -----'
-puts
-
-puts "Date   " + tags.map{ |t| '%10s' % t }.join(' ') + "  Description"
+puts "Date     ".underline + ' ' + tags.map{ |t| pad(t, t).underline }.join(' ') + '  ' + 'Description'.underline
 
 (report_start..report_end).each do |day|
   expected += HOURS_PER_DAY if is_workday? day
   
-  daystr = is_workday?(day) ? day.strftime('%d %a').green : day.strftime('%d %a')
+  daystr = is_workday?(day) ? day.strftime('%m/%d %a') : day.strftime('%m/%d %a').light_black
   
   unless days.has_key? day
     puts daystr
@@ -102,39 +102,37 @@ puts "Date   " + tags.map{ |t| '%10s' % t }.join(' ') + "  Description"
       d = round_duration(entries[t]['duration'])
       totals[t] += d
       
-      d
+      pad(t, '%.2f' % d)
     else
-      0
-    end
-  end.map do |e|
-    if e > 0
-      '%10.2f' % e
-    else
-      '         -'
+      pad(t, '-')
     end
   end.join(' ')
   
-  str += '  ' + entries.map{ |t, e| "#{t}: " + e['description'].join(', ') }.join(', ')
+  str += '  ' + entries.reject{ |k, _| SPECIAL_TAGS.include? k }.map{ |t, e| "#{t}: " + e['description'].join(', ') }.join(', ')
+  
+  unless entries.size > 0
+    str += "WARNING: No tags used!".red
+  end
   
   puts str
 end
 
-puts
-
 sum = totals.map{ |t, d| d }.reduce(:+)
-productive = totals.map do |t, d|
-  if SPECIAL_TAGS.include? t
-    0
-  else
-    d
-  end
-end.reduce(:+)
+productive = totals.reject{ |k, _| SPECIAL_TAGS.include? k }.values.reduce(:+)
 
-puts 'TOTAL  ' + totals.map{ |t, d| '%10.2f' % d }.join(' ')
-puts '       ' + totals.map{ |t, d| '%9.0f%%' % (d / productive * 100) }.join(' ')
+puts '          ' + totals.map{ |t, d| pad(t, '%.2f' % d) }.join(' ').bold
+puts '          ' + (totals.map do |t, d|
+  unless SPECIAL_TAGS.include? t
+    pad(t, '%.0f%%' % (d / productive * 100))
+  else
+    pad(t, '')
+  end
+end.join(' ')).cyan
 
 puts
 
-puts "Expected: %3.1f hours" % expected
-puts "Actual:   %3.1f hours" % sum
-puts "Overtime: %3.1f hours" % (sum - expected)
+puts "Expected: %6.1f hours" % expected
+if sum
+  puts "Actual:   %6.1f hours" % sum
+  puts "Overtime: %6.1f hours" % (sum - expected)
+end
