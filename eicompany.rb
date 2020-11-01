@@ -76,26 +76,25 @@ entries.each do |e|
   end
 end
 
-expected = 0
-
-tags = SPECIAL_TAGS + (tags - Set.new(SPECIAL_TAGS)).to_a
+tags = SPECIAL_TAGS + (tags - Set.new(SPECIAL_TAGS)).to_a.sort
 totals = tags.map { |t| [t, 0] }.to_h
 
-puts 'Date     '.underline + ' ' + tags.map { |t| pad(t, t).underline }.join(' ') + '  ' + 'Description'.underline
+puts 'Date     '.underline + ' ' +
+     tags.map { |t| pad(t, t).underline }.join(' ') + '  ' +
+     'Description'.underline
 
 (report_start..report_end).each do |day|
-  expected += HOURS_PER_DAY if workday? day
-
-  daystr = workday?(day) ? day.strftime('%m/%d %a') : day.strftime('%m/%d %a').light_black
+  str = day.strftime('%m/%d %a')
+  str = str.light_black unless workday?(day)
 
   unless days.key? day
-    puts daystr
+    puts str
     next
   end
 
   entries = days[day]
 
-  str = daystr + ' '
+  str += ' '
 
   str += tags.map do |t|
     if entries.key? t
@@ -115,13 +114,18 @@ puts 'Date     '.underline + ' ' + tags.map { |t| pad(t, t).underline }.join(' '
   end.join(' ')
 
   str += '  ' + entries.reject { |k, _| SPECIAL_TAGS.include? k }
-                       .map { |t, e| "#{t}: " + e['description'].join(', ') }
-                       .join(', ')
-
-  str += 'WARNING: No tags used!'.red if entries.empty?
+                       .map do |t, e|
+                         if e['description'].empty?
+                           t.yellow
+                         else
+                           "#{t}: " + e['description'].join(', ')
+                         end
+                       end.join(', ')
 
   puts str
 end
+
+expected = (report_start..report_end).select { |d| workday? d }.size * HOURS_PER_DAY
 
 sum = totals.values.reduce(:+)
 productive = totals.reject { |k, _| SPECIAL_TAGS.include? k }.values.reduce(:+)
@@ -129,7 +133,7 @@ productive = totals.reject { |k, _| SPECIAL_TAGS.include? k }.values.reduce(:+)
 puts '          ' + totals.map { |t, d| pad(t, '%.2f' % d) }.join(' ').bold
 puts '          ' + (totals.map do |t, d|
   if !SPECIAL_TAGS.include? t
-    pad(t, '%.0f%%' % (d / productive * 100))
+    pad(t, format('%.0f%%', (d / productive * 100)))
   else
     pad(t, '')
   end
@@ -137,8 +141,8 @@ end.join(' ')).cyan
 
 puts
 
-puts "Expected: %6.1f hours" % expected
+puts 'Expected: %6.1f hours' % expected
 if sum
-  puts "Actual:   %6.1f hours" % sum
-  puts "Overtime: %6.1f hours" % (sum - expected)
+  puts 'Actual:   %6.1f hours' % sum
+  puts format('Overtime: %6.1f hours', (sum - expected))
 end
