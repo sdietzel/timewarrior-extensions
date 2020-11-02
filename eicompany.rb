@@ -69,10 +69,10 @@ entries.each do |e|
   e['tags'].each do |tag|
     tags.add(tag)
 
-    days[date][tag] = { 'duration' => 0, 'description' => [] } unless days[date].key? tag
+    days[date][tag] = { 'duration' => 0, 'description' => Set[] } unless days[date].key? tag
 
     days[date][tag]['duration'] += e['duration'] / e['tags'].size
-    days[date][tag]['description'] += [e['annotation']] if e.key? 'annotation'
+    days[date][tag]['description'].add e['annotation'] if e.key? 'annotation'
   end
 end
 
@@ -118,7 +118,7 @@ puts 'Date     '.underline + ' ' +
                          if e['description'].empty?
                            t.yellow
                          else
-                           "#{t}: " + e['description'].join(', ')
+                           "#{t}: " + e['description'].to_a.join(', ')
                          end
                        end.join(', ')
 
