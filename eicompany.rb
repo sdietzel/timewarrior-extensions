@@ -45,11 +45,19 @@ report_end = if (m = config.match(/temp.report.end: (?<date>.+)/))
 
 entries = JSON.parse(entries)
 
-entries.map! do |e|
-  e['start'] = DateTime.parse(e['start'])
-  e['end'] = DateTime.parse(e['end'])
+active_tags = []
 
+entries.map! do |e|
   e['tags'].map!(&:upcase) if e.key? 'tags'
+
+  e['start'] = DateTime.parse(e['start'])
+  if e.key? 'end'
+    e['end'] = DateTime.parse(e['end'])
+  else
+    e['end'] = DateTime.now
+    active_tags = e['tags'] if e.key? 'tags'
+  end
+
 
   e['duration'] = (e['end'] - e['start']) * 24.0
 
@@ -69,10 +77,10 @@ entries.each do |e|
   e['tags'].each do |tag|
     tags.add(tag)
 
-    days[date][tag] = { 'duration' => 0, 'description' => Set[] } unless days[date].key? tag
+    days[date][tag] = { 'duration' => 0, 'description' => [] } unless days[date].key? tag
 
     days[date][tag]['duration'] += e['duration'] / e['tags'].size
-    days[date][tag]['description'].add e['annotation'] if e.key? 'annotation'
+    days[date][tag]['description'] += [e['annotation']] if e.key? 'annotation'
   end
 end
 
@@ -80,12 +88,19 @@ tags = SPECIAL_TAGS + (tags - Set.new(SPECIAL_TAGS)).to_a.sort
 totals = tags.map { |t| [t, 0] }.to_h
 
 puts 'Date     '.underline + ' ' +
-     tags.map { |t| pad(t, t).underline }.join(' ') + '  ' +
+     (tags.map do |t|
+       if active_tags.include? t
+         pad(t, t).green.underline
+       else
+         pad(t, t).underline
+       end
+     end.join(' ')) + '  ' +
      'Description'.underline
 
 (report_start..report_end).each do |day|
   str = day.strftime('%m/%d %a')
   str = str.light_black unless workday?(day)
+  str = str.blue if day == Date.today
 
   unless days.key? day
     puts str
@@ -105,6 +120,8 @@ puts 'Date     '.underline + ' ' +
 
       if t == UNKNOWN
         s.yellow
+      elsif day == Date.today and active_tags.include? t
+        s.green
       else
         s
       end
@@ -118,9 +135,9 @@ puts 'Date     '.underline + ' ' +
                          if e['description'].empty?
                            t.yellow
                          else
-                           "#{t}: " + e['description'].to_a.join(', ')
+                           "#{t}: " + e['description'].join(', ')
                          end
-                       end.join(', ')
+                       end.join(' / ')
 
   puts str
 end
@@ -132,7 +149,7 @@ productive = totals.reject { |k, _| SPECIAL_TAGS.include? k }.values.reduce(:+)
 
 puts '          ' + totals.map { |t, d| pad(t, '%.2f' % d) }.join(' ').bold
 puts '          ' + (totals.map do |t, d|
-  if !SPECIAL_TAGS.include? t
+  if !SPECIAL_TAGS.include? t and productive > 0
     pad(t, format('%.0f%%', (d / productive * 100)))
   else
     pad(t, '')
