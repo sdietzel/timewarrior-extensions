@@ -135,7 +135,7 @@ puts 'Date     '.underline + ' ' +
                          if e['description'].empty?
                            t.yellow
                          else
-                           "#{t}: " + e['description'].join(', ')
+                           "#{t}: " + e['description'].uniq.join(', ')
                          end
                        end.join(' / ')
 
