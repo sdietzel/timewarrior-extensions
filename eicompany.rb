@@ -38,7 +38,7 @@ report_start = if (m = config.match(/temp.report.start: (?<date>.+)/))
                end
 
 report_end = if (m = config.match(/temp.report.end: (?<date>.+)/))
-               DateTime.parse(m[:date]).to_time.getlocal.to_date
+               DateTime.parse(m[:date]).to_time.getlocal.to_date - 1
              else
                Date.today
              end
