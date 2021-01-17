@@ -16,7 +16,13 @@ class Date
 end
 
 def round_duration(duration)
-  (duration * 4).ceil.to_f / 4.0
+  return 0.25 if duration < 0.25
+
+  if duration % 0.25 < 5.0 / 60.0
+    (duration * 4).floor.to_f / 4.0
+  else
+    (duration * 4).ceil.to_f / 4.0
+  end
 end
 
 def workday?(day)
